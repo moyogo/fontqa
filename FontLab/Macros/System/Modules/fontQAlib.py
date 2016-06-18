@@ -36,6 +36,7 @@ from FL import *
 import fontQAdialog
 from fontQAdialog import SuiteDialog
 from fontQAtools import average, StdDeviation
+import re
 
 shortNotice =  'fontQA ' + __version__ + ', Copyright (C) '+ __author__ + '\n' 
 shortNotice += 'fontQA comes with ABSOLUTELY NO WARRANTY. ' 
@@ -146,6 +147,9 @@ class TestSuite(metaTestItem):
     self.testBlockList = self._childs
 
   def addBlock(self, TheName, TheTag):
+    m = re.search(r"\W", TheTag)
+    if m:
+      raise ValueError, 'Second parameter has to contain only alphanumeric characters ( \w or [a-zA-Z0-9_] ) .'
     result = TestBlock(TheName, TheTag)
     self.append(result)
     return result
@@ -225,6 +229,7 @@ class TestBlock(metaTestItem):
     return result
 
   def _doTest(self):
+    #print self.name
     self.XMLwriter.begintag(self.className(), name=self.name, tag=self.tag)
     self.XMLwriter.newline()
     for anyItem in self.testItemList:
@@ -309,6 +314,8 @@ class TestItem(metaTestItem):
 
   def _tryTest(self, TheFont):
     result = None
+    if len(TheFont.glyphs) == 0:
+      return result
     try:
       result = self._testFont(TheFont)
     except:
@@ -371,7 +378,14 @@ class simpleTest(TestItem):
     for i in range(len(self)):
       detailReport = {}
       detailReport['FontName'] = self.testFontList[i].full_name
-      if self.testResultList[i] == []:
+      if self.testResultList[i] == None:
+        detailReport['ErrorNum'] = Info
+        if self.DetailMessages[Info]:
+          detailReport['Message']  = self.DetailMessages[Info]
+        else:
+          detailReport['Message']  = self.ErrorMessages[Info]
+        detailReport['Details']  = '-'
+      elif self.testResultList[i] == []:
         detailReport['ErrorNum'] = self.testPass
         if self.DetailMessages[Info]:
           detailReport['Message']  = self.DetailMessages[self.testPass]
@@ -504,34 +518,128 @@ class allValuesEqual(TestItem):
 
 
 #----------------------------------------------------------------------------
+class RangeCheck(TestItem):
+  '''
+  The valid valuerange is calculated for every font
+  '''
+  def __init__(self, TheValueName):
+    TestItem.__init__(self, TheValueName)
+    self.ValueName = TheValueName
+    self.ErrorMessages[Passed] = 'All ' + self.ValueName + \
+                                 ' values are in the calculated range'
+    self.ErrorMessages[Error]  = 'Not all ' + self.ValueName + \
+                                 ' values are in the required range'
+    self.ErrorMessages[Warn]   = 'Not all ' + self.ValueName + \
+                                 ' values are in the recommended range'
+
+  def _getMinValue(self, TheFont=None):
+    return None
+
+  def _getMaxValue(self, TheFont=None):
+    return None
+
+  def _summarizeTests(self):
+    for i in range(len(self)):
+      detailReport = {}
+      detailReport['FontName'] = self.testFontList[i].full_name
+      detailReport['Message']  = str(self.ValueName)
+      minVal = self._getMinValue(self.testFontList[i])
+      maxVal = self._getMaxValue(self.testFontList[i])
+      if self.testResultList[i] >= minVal and self.testResultList[i] <= maxVal:
+        detailReport['ErrorNum'] = self.testPass
+        if self.testFail == Error:
+          detailReport['Message'] = 'The ' + self.ValueName + \
+                                    ' value is in the required range'
+        else:
+          detailReport['Message'] = 'The ' + self.ValueName + \
+                                    ' value is in the recommended range'
+        detailReport['Details'] = self.ValueName + ': ' + str(self.testResultList[i])
+      else:
+        detailReport['ErrorNum'] = self.testFail
+        if self.testFail == Error:
+          detailReport['Message'] = 'The ' + self.ValueName + \
+                                    ' value is not in the required range'
+          detailReport['Details'] = self.ValueName + ': ' + \
+                                    str(self.testResultList[i]) + \
+                                    ', required: (' + str(minVal) + ' - ' + str(maxVal) + ')'
+        else:
+          detailReport['Message'] = 'The ' + self.ValueName + \
+                                    ' value is not in the recommended range'
+          detailReport['Details'] = self.ValueName + ': ' + \
+                                    str(self.testResultList[i]) + \
+                                    ', recommended: (' + str(minVal) + ' - ' + str(maxVal) + ')'
+      self.testReportList.append(detailReport)
+
+
+#----------------------------------------------------------------------------
 class FamilyStatistic(TestItem):
   def __init__(self, TheValueName):
     TestItem.__init__(self, TheValueName)
     self.ValueName = TheValueName
     self.ErrorMessages[Info] ='Family Statistic'
 
-  def ErrorNum(self):
-    return Info
-
   def _summarizeTests(self):
-    _max = int(max(self.testResultList))
-    _min = int(min(self.testResultList))
-    _rng = int(abs(_max - _min))
-    _avg = int(round(average(self.testResultList)))
-    _sdv = int(round(StdDeviation(self.testResultList)))
-    self.ErrorDetails   = 'min: ' + str(_min) + ', max: ' + str(_max) + ', rng: ' + str(_rng) + ', avg: ' + str(_avg) + ', sdv: '+ str(_sdv)
-    for i in range(len(self)):
-      detailReport = {}
-      detailReport['FontName'] = self.testFontList[i].full_name
-      if abs(self.testResultList[i] - _avg) > _sdv * 1.5:
-        detailReport['ErrorNum'] = Error
-      elif abs(self.testResultList[i] - _avg) > _sdv * 1.2:
-        detailReport['ErrorNum'] = Warn
+    if type(self.testResultList) is ListType and len(self.testResultList) > 0:
+      if len(self.testResultList) == len(self):
+        fontsNoAnalysisError = []
+        fontsAnalysisError = []
+        for i in range(len(self.testResultList)):
+          try:
+            int(self.testResultList[i])
+            fontsNoAnalysisError.append(i)
+          except:
+            fontsAnalysisError.append(i)
+        
+        if fontsAnalysisError == []:
+          _max = int(max(self.testResultList))
+          _min = int(min(self.testResultList))
+          _rng = int(abs(_max - _min))
+          _avg = int(round(average(self.testResultList)))
+          _sdv = int(round(StdDeviation(self.testResultList)))
+          for i in range(len(self)):
+            detailReport = {}
+            detailReport['Message']  = self.ValueName
+            detailReport['FontName'] = self.testFontList[i].full_name
+            detailReport['ErrorNum'] = Info
+#            if abs(self.testResultList[i] - _avg) > _sdv * 1.5:
+#              detailReport['ErrorNum'] = Error
+#            elif abs(self.testResultList[i] - _avg) > _sdv * 1.2:
+#              detailReport['ErrorNum'] = Warn
+#            else:
+#              detailReport['ErrorNum'] = Info
+            try:
+              detailReport['Details'] = str(int(self.testResultList[i]))
+            except:
+              detailReport['Details'] = 'FamilyStatistic is not applicable because font contains no glyphs.'
+            self.testReportList.append(detailReport)
+          self.ErrorDetails   = 'min: ' + str(_min) + ', max: ' + str(_max) + ', rng: ' + str(_rng) + ', avg: ' + str(_avg) + ', sdv: '+ str(_sdv)
+        else:
+          for i in range(len(self.testResultList)):
+            if i in fontsAnalysisError:
+              detailReport = {}
+              detailReport['Message']  = self.ValueName
+              detailReport['FontName'] = self.testFontList[i].full_name
+              detailReport['ErrorNum'] = Error
+              detailReport['Details'] = 'FamilyStatistic is not applicable because at least one font contains no glyphs or glyphs have no outlines.'
+              self.testReportList.append(detailReport)
+            elif i in fontsNoAnalysisError:
+              detailReport = {}
+              detailReport['Message']  = self.ValueName
+              detailReport['FontName'] = self.testFontList[i].full_name
+              detailReport['ErrorNum'] = Warn
+              detailReport['Details'] = 'FamilyStatistic is not applicable because at least one other opened font(s) contains no glyphs or glyphs have no outlines.'
+              self.testReportList.append(detailReport)
       else:
-        detailReport['ErrorNum'] = Info
+        raise Exception 
+    else:
+      detailReport = {}
       detailReport['Message']  = self.ValueName
-      detailReport['Details'] = str(int(self.testResultList[i]))
+      detailReport['ErrorNum'] = Error
+      detailReport['Details']  = 'FamilyStatistic is not applicable because font contains no glyphs.'
+      detailReport['FontName'] = self.testFontList.full_name
+      self.ErrorDetails   = 'FamilyStatistic is not applicable because font contains no glyphs.'
       self.testReportList.append(detailReport)
+
 
 
 #----------------------------------------------------------------------------
@@ -546,16 +654,24 @@ class FontStatistic(TestItem):
 
   def _summarizeTests(self):
     for i in range(len(self)):
-      _max = int(max(self.testResultList[i]))
-      _min = int(min(self.testResultList[i]))
-      _rng = int(abs(_max - _min))
-      _avg = int(round(average(self.testResultList[i])))
-      _sdv = int(round(StdDeviation(self.testResultList[i])))
-      detailReport = {}
-      detailReport['FontName'] = self.testFontList[i].full_name
-      detailReport['ErrorNum'] = Info
-      detailReport['Message']  = self.ValueName
-      detailReport['Details'] = 'min: ' + str(_min) + ', max: ' + str(_max) + ', rng: ' + str(_rng) + ', avg: ' + str(_avg) + ', sdv: '+ str(_sdv)
+      #print '-',self.testResultList[i], '-'
+      if type(self.testResultList[i]) is ListType and len(self.testResultList[i]) > 0:
+        _max = int(max(self.testResultList[i]))
+        _min = int(min(self.testResultList[i]))
+        _rng = int(abs(_max - _min))
+        _avg = int(round(average(self.testResultList[i])))
+        _sdv = int(round(StdDeviation(self.testResultList[i])))
+        detailReport = {}
+        detailReport['FontName'] = self.testFontList[i].full_name
+        detailReport['ErrorNum'] = Info
+        detailReport['Message']  = self.ValueName
+        detailReport['Details'] = 'min: ' + str(_min) + ', max: ' + str(_max) + ', rng: ' + str(_rng) + ', avg: ' + str(_avg) + ', sdv: '+ str(_sdv)
+      else:
+        detailReport = {}
+        detailReport['FontName'] = self.testFontList[i].full_name
+        detailReport['ErrorNum'] = Warn
+        detailReport['Message']  = self.ValueName
+        detailReport['Details'] = 'FontStatistic is not applicable because font contains no glyphs or glyphs have no outlines.'
       self.testReportList.append(detailReport)
 
 
@@ -597,10 +713,10 @@ class GlyphTest(TestItem):
         detailReport['Details']  = self.testResultList[i][2]
       else:
         detailReport['ErrorNum'] = self.testFail
-        if self.DetailMessages[Info]:
-          detailReport['Message']  = self.DetailMessages[self.testFail]
+        if self.DetailMessages[self.testFail]:
+          detailReport['Message'] = self.DetailMessages[self.testFail]
         else:
-          detailReport['Message']  = self.ErrorMessages[self.testFail]
+          detailReport['Message'] = self.ErrorMessages[self.testFail]
         myDetail = ''
         for anyGlyphName in self.testResultList[i]:
           myDetail += anyGlyphName + ', '

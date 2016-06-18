@@ -148,10 +148,14 @@ def trueFontBox(TheFont, masterindex=0):
   @rtype : FontLab Rect object
   '''
   if TheFont != None and len(TheFont.glyphs) > 0:
-    result = Rect()
+    #result = Rect()
+    result = None
     for anyGlyph in TheFont.glyphs:
       gRect = trueBBox(anyGlyph, masterindex)
-      if type(gRect) != type(None):
+      if type(gRect) != type(None) and type(result) is type(None):
+        result = Rect()
+        result.Include(gRect)
+      elif type(gRect) != type(None) and not type(result) is type(None):
         result.Include(gRect)
     return result
   else:

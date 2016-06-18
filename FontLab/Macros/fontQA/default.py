@@ -86,8 +86,11 @@ Hinting.addItem(NoHint_Check)
 Hinting.addItem(VHintBBox)
 Hinting.addItem(HHintBBox)
 
-if mySuite.showDialog() == 1:
-  mySuite.doTest()
-print 'done'
+if len(fl) > 0:
+  if mySuite.showDialog() == 1:
+    mySuite.doTest()
+  print 'done'
+else:
+  print 'Please open fonts to scan in fontlab.'
 
 #EOF

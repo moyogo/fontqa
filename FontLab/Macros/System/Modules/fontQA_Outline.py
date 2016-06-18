@@ -47,6 +47,8 @@ class Contour_Statistic(FontStatistic):
     for anyGlyph in TheFont.glyphs:
       if len(anyGlyph) > 0:
         result.append(anyGlyph.GetContoursNumber())
+      else:
+      	result.append(0)
     return result
 
 
@@ -64,6 +66,8 @@ class Node_Statistic(FontStatistic):
       if len(anyGlyph) > 0:
         for i in range(anyGlyph.GetContoursNumber()):
           result.append(anyGlyph.GetContourLength(i))
+      else:
+      	result.append(0)
     return result
 
 

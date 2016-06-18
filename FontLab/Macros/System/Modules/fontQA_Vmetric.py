@@ -44,7 +44,10 @@ class Ymin_Statistic(FamilyStatistic):
     FamilyStatistic.__init__(self, 'Y-min')
 
   def _testFont(self, TheFont):
-    return trueFontBox(TheFont).ll.y
+    if type(trueFontBox(TheFont)) is type(Rect()):
+      return trueFontBox(TheFont).ll.y
+    else:
+      return None
 
 
 #----------------------------------------------------------------------------
@@ -56,7 +59,10 @@ class Ymax_Statistic(FamilyStatistic):
     FamilyStatistic.__init__(self, 'Y-max')
 
   def _testFont(self, TheFont):
-    return trueFontBox(TheFont).ur.y
+    if type(trueFontBox(TheFont)) is type(Rect()):
+      return trueFontBox(TheFont).ur.y
+    else:
+      return None
 
 
 #----------------------------------------------------------------------------
@@ -148,7 +154,8 @@ class WinAscent(allMatchOneValue):
   def _getRequiredValue(self):
     familyBBox = Rect()
     for i in range(len(self)):
-      familyBBox.Include(trueFontBox(self.testFontList[i]))
+      if type(trueFontBox(self.testFontList[i])) is type(Rect()):
+        familyBBox.Include(trueFontBox(self.testFontList[i]))
     return int(familyBBox.ur.y)
 
   def _testFont(self, TheFont):
@@ -167,7 +174,8 @@ class WinDescent(allMatchOneValue):
   def _getRequiredValue(self):
     familyBBox = Rect()
     for i in range(len(self)):
-      familyBBox.Include(trueFontBox(self.testFontList[i]))
+      if type(trueFontBox(self.testFontList[i])) is type(Rect()):
+        familyBBox.Include(trueFontBox(self.testFontList[i]))
     return int(familyBBox.ll.y) * -1
 
   def _testFont(self, TheFont):
