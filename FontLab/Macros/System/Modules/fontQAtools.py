@@ -28,12 +28,8 @@ This module contains basic functions used by other tests.
 import math
 from types import IntType,ListType
 
-#import fontQAlib
-#__version__ = fontQAlib.__version__
-#__author__  = fontQAlib.__author__
-#__email__   = fontQAlib.__email__
-
 from FL import *
+
 #-----------------------------------------------------------------------------
 # some basic math
 #-----------------------------------------------------------------------------
@@ -151,7 +147,7 @@ def trueFontBox(TheFont, masterindex=0):
   @return: a rectangle enclosing all nodes AND all components of all glyphs in 'TheFont'.
   @rtype : FontLab Rect object
   '''
-  if TheFont != None and TheFont.glyphs:
+  if TheFont != None and len(TheFont.glyphs) > 0:
     result = Rect()
     for anyGlyph in TheFont.glyphs:
       gRect = trueBBox(anyGlyph, masterindex)
